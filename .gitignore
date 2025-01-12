@@ -97,3 +97,8 @@ web/.dart_tool/
 
 # Linux
 linux/flutter/ephemeral/
+
+
+.metadata
+.dart_tool/
+build/
