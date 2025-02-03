@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:PF/database/database_helper.dart';
-import 'package:PF/screens/HomeScreen.dart';
+import 'package:DOIT/database/database_helper.dart';
+import 'package:DOIT/screens/HomeScreen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:PF/screens/SignUpScreen.dart';
+import 'package:DOIT/screens/SignUpScreen.dart';
+
 
 class LoginScreen extends StatefulWidget {
   @override

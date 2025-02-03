@@ -1,22 +1,45 @@
 // Main entry point for the app
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:PF/database/database_helper.dart';
-import 'package:PF/screens/login_screen.dart';
-import 'package:PF/screens/HomeScreen.dart';
+import 'package:DOIT/database/database_helper.dart';
+import 'package:DOIT/screens/login_screen.dart';
+import 'package:DOIT/screens/HomeScreen.dart';
+import 'package:DOIT/theme/theme_provider.dart'; // Import the ThemeProvider
 
-void main() => runApp(MyApp());
+void main() => runApp(
+  ChangeNotifierProvider(
+    create: (_) => ThemeProvider(),
+    child: MyApp(),
+  ),
+);
 
 class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+
     return MaterialApp(
+      debugShowCheckedModeBanner: false,
       title: 'To-Do App',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        scaffoldBackgroundColor: Colors.grey[100],
+      theme: ThemeData.light().copyWith(
+        primaryColor: Colors.blue, // Use primaryColor for a single color
+        colorScheme: ColorScheme.light(
+          primary: Colors.blue, // Primary color
+          secondary: Colors.purple, // Accent color
+        ),
+        scaffoldBackgroundColor: Colors.grey[100], // Light background
       ),
-      home: AuthChecker(), // Initial screen to check authentication status
+      darkTheme: ThemeData.dark().copyWith(
+        primaryColor: Colors.blue, // Use primaryColor for a single color
+        colorScheme: ColorScheme.dark(
+          primary: Colors.blue, // Primary color
+          secondary: Colors.purple, // Accent color
+        ),
+        scaffoldBackgroundColor: Colors.grey[900], // Dark background
+      ),
+      themeMode: themeProvider.themeMode, // Use the selected theme mode
+      home: AuthChecker(),
     );
   }
 }

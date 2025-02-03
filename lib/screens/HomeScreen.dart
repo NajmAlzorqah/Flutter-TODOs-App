@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:PF/database/database_helper.dart';
-import 'package:PF/screens/login_screen.dart';
+import 'package:DOIT/database/database_helper.dart';
+import 'package:DOIT/screens/login_screen.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:intl/intl.dart'; // For date formatting
+import 'package:DOIT/theme/theme_provider.dart'; // Import the ThemeProvider
 
 class HomeScreen extends StatefulWidget {
   final Map<String, dynamic> user;
@@ -22,12 +24,13 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   late AnimationController _animationController;
   late Animation<double> _animation;
   XFile? _selectedImage; // For avatar image
-  bool _isExpanded = false; // To control the expansion of the input field
+  final ImagePicker _picker = ImagePicker(); // For picking images
 
   @override
   void initState() {
     super.initState();
     _fetchTasks();
+    _loadProfileImage(); // Load the saved profile image when the app starts
 
     // Initialize animation controller
     _animationController = AnimationController(
@@ -76,9 +79,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
     _taskController.clear();
     _fetchTasks();
-    setState(() {
-      _isExpanded = false; // Collapse the input field after adding a task
-    });
   }
 
   void _deleteTask(int id) async {
@@ -114,11 +114,22 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   // Function to pick an image from the gallery
   Future<void> _pickImage() async {
-    final picker = ImagePicker();
-    final image = await picker.pickImage(source: ImageSource.gallery);
+    final image = await _picker.pickImage(source: ImageSource.gallery);
     if (image != null) {
       setState(() {
         _selectedImage = image;
+      });
+      // Save the profile picture path to the database
+      await _dbHelper.updateProfilePicture(widget.user['username'], image.path);
+    }
+  }
+
+  // Load the profile image path from the database
+  Future<void> _loadProfileImage() async {
+    final imagePath = await _dbHelper.getProfilePicture(widget.user['username']);
+    if (imagePath != null) {
+      setState(() {
+        _selectedImage = XFile(imagePath);
       });
     }
   }
@@ -162,10 +173,13 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   @override
   Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final isDarkMode = themeProvider.themeMode == ThemeMode.dark;
+
     return Scaffold(
       appBar: AppBar(
         title: Text('Welcome, ${widget.user['username']}'),
-        backgroundColor: Colors.blue.shade800,
+        backgroundColor: isDarkMode ? Colors.blue.shade800 : Colors.blue.shade200, // AppBar color
         elevation: 0,
       ),
       drawer: Drawer(
@@ -174,10 +188,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [
-                Colors.blue.shade800,
-                Colors.purple.shade600,
-              ],
+              colors: isDarkMode
+                  ? [Colors.blue.shade800, Colors.purple.shade600] // Dark mode gradient
+                  : [Colors.blue.shade200, Colors.purple.shade200], // Light mode gradient
             ),
           ),
           child: ListView(
@@ -212,14 +225,60 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 leading: Icon(Icons.settings, color: Colors.white),
                 title: Text('Settings', style: TextStyle(color: Colors.white)),
                 onTap: () {
-                  // Add settings functionality here
+                  showDialog(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: Text('Theme Mode'),
+                      content: Text('Switch between day and night mode.'),
+                      actions: [
+                        TextButton(
+                          onPressed: () {
+                            themeProvider.toggleTheme(false); // Set to day mode
+                            Navigator.pop(context);
+                          },
+                          child: Text('Day Mode', style: TextStyle(color: Colors.blue.shade800)),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            themeProvider.toggleTheme(true); // Set to night mode
+                            Navigator.pop(context);
+                          },
+                          child: Text('Night Mode', style: TextStyle(color: Colors.blue.shade800)),
+                        ),
+                      ],
+                    ),
+                  );
                 },
               ),
               ListTile(
                 leading: Icon(Icons.info, color: Colors.white),
                 title: Text('About', style: TextStyle(color: Colors.white)),
                 onTap: () {
-                  // Add about functionality here
+                  showDialog(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: Text('About To-Do App'),
+                      content: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Version: 1.0.0'),
+                          SizedBox(height: 10),
+                          Text('Developed by: Flutter Dev Team'),
+                          SizedBox(height: 10),
+                          Text('Contact: support@todoapp.com'),
+                          SizedBox(height: 10),
+                          Text('© 2023 To-Do App. All rights reserved.'),
+                        ],
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: Text('Close', style: TextStyle(color: Colors.blue.shade800)),
+                        ),
+                      ],
+                    ),
+                  );
                 },
               ),
               Divider(color: Colors.white70),
@@ -239,10 +298,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [
-                  Colors.blue.shade800,
-                  Colors.purple.shade600,
-                ],
+                colors: isDarkMode
+                    ? [Colors.blue.shade800, Colors.purple.shade600] // Dark mode gradient
+                    : [Colors.blue.shade50, Colors.purple.shade50], // Light mode gradient
               ),
             ),
             child: Padding(
@@ -271,14 +329,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                         ? "Today's Tasks"
                                         : "$date Tasks",
                                     style: TextStyle(
-                                      color: Colors.white,
+                                      color: isDarkMode ? Colors.white : Colors.blue.shade800, // Text color
                                       fontSize: 18,
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
                                 ),
                                 ...tasks.map((task) => Card(
-                                  color: Colors.white.withOpacity(0.1),
+                                  color: isDarkMode ? Colors.blue.shade900 : Colors.blue.shade50, // Task card background color
                                   margin: EdgeInsets.symmetric(vertical: 5),
                                   child: ListTile(
                                     leading: Checkbox(
@@ -291,7 +349,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                     title: Text(
                                       task['task'],
                                       style: TextStyle(
-                                        color: Colors.white,
+                                        color: isDarkMode ? Colors.white : Colors.blue.shade800, // Text color
                                         decoration: task['isDone'] == 1
                                             ? TextDecoration.lineThrough
                                             : null,
@@ -299,7 +357,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                     ),
                                     subtitle: Text(
                                       task['dateAdded'],
-                                      style: TextStyle(color: Colors.white70),
+                                      style: TextStyle(color: isDarkMode ? Colors.white70 : Colors.blue.shade800.withOpacity(0.7)),
                                     ),
                                     trailing: IconButton(
                                       icon: Icon(Icons.delete, color: Colors.redAccent),
@@ -307,7 +365,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                     ),
                                   ),
                                 )),
-                                Divider(color: Colors.white70),
+                                Divider(color: isDarkMode ? Colors.white70 : Colors.blue.shade200),
                               ],
                             );
                           }).toList(),
@@ -319,15 +377,15 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               ),
             ),
           ),
-          // Floating Action Button at the middle bottom
+          // Bottom input section
           Positioned(
-            left: 16, // Add some padding
-            right: 16, // Add some padding
-            bottom: 20, // Position at the bottom
+            left: 16,
+            right: 16,
+            bottom: 20,
             child: Container(
               height: 56,
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: isDarkMode ? Colors.blue.shade800 : Colors.white, // Input field background color
                 borderRadius: BorderRadius.circular(28),
                 boxShadow: [
                   BoxShadow(
@@ -344,21 +402,23 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                       padding: const EdgeInsets.only(left: 16),
                       child: TextField(
                         controller: _taskController,
-                        style: TextStyle(color: Colors.blue.shade800),
+                        style: TextStyle(color: isDarkMode ? Colors.white : Colors.blue.shade800), // Text color
                         decoration: InputDecoration(
                           hintText: 'New Task',
-                          hintStyle: TextStyle(color: Colors.blue.shade800.withOpacity(0.5)),
+                          hintStyle: TextStyle(color: isDarkMode ? Colors.white70 : Colors.blue.shade800.withOpacity(0.5)),
                           border: InputBorder.none,
                         ),
+                        maxLines: null, // Allows multiple lines
+                        keyboardType: TextInputType.multiline, // Enables multiline input
                       ),
                     ),
                   ),
                   IconButton(
                     icon: Icon(
-                      Icons.add, // Plus icon
-                      color: Colors.blue.shade800,
+                      Icons.add,
+                      color: isDarkMode ? Colors.white : Colors.blue.shade800, // Icon color
                     ),
-                    onPressed: _addTask, // Add task when pressed
+                    onPressed: _addTask,
                   ),
                 ],
               ),

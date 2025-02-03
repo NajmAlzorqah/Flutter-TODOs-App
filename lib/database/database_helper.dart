@@ -1,6 +1,5 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
-import 'package:intl/intl.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper _instance = DatabaseHelper._();
@@ -17,16 +16,6 @@ class DatabaseHelper {
     return _database!;
   }
 
-  Future<List<Map<String, dynamic>>> getTasksByUser(String username) async {
-    final db = await database;
-    return await db.query(
-      'tasks',
-      where: 'username = ?',
-      whereArgs: [username],
-      orderBy: 'dateAdded DESC',
-    );
-  }
-
   // Initialize the SQLite database
   Future<Database> _initDatabase() async {
     final dbPath = await getDatabasesPath();
@@ -34,31 +23,41 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 2, // Increment the version to trigger the schema update
       onCreate: _onCreate,
+      onUpgrade: _onUpgrade, // Handle schema updates
     );
   }
 
   // Create the necessary tables
   Future<void> _onCreate(Database db, int version) async {
     await db.execute('''
-    CREATE TABLE users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      username TEXT NOT NULL,
-      email TEXT NOT NULL,
-      password TEXT NOT NULL
-    )
-  ''');
+      CREATE TABLE users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT NOT NULL,
+        email TEXT NOT NULL,
+        password TEXT NOT NULL,
+        profile_picture TEXT
+      )
+    ''');
 
     await db.execute('''
-    CREATE TABLE tasks (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      task TEXT NOT NULL,
-      isDone INTEGER NOT NULL,
-      dateAdded TEXT NOT NULL,
-      username TEXT NOT NULL
-    )
-  ''');
+      CREATE TABLE tasks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        task TEXT NOT NULL,
+        isDone INTEGER NOT NULL,
+        dateAdded TEXT NOT NULL,
+        username TEXT NOT NULL
+      )
+    ''');
+  }
+
+  // Handle schema updates
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      // Add the profile_picture column to the users table
+      await db.execute('ALTER TABLE users ADD COLUMN profile_picture TEXT');
+    }
   }
 
   // Insert a new user into the database
@@ -78,19 +77,44 @@ class DatabaseHelper {
     return results.isNotEmpty ? results.first : null;
   }
 
+  // Update the profile picture path for a user
+  Future<void> updateProfilePicture(String username, String imagePath) async {
+    final db = await database;
+    await db.update(
+      'users',
+      {'profile_picture': imagePath},
+      where: 'username = ?',
+      whereArgs: [username],
+    );
+  }
+
+  // Get the profile picture path for a user
+  Future<String?> getProfilePicture(String username) async {
+    final db = await database;
+    final results = await db.query(
+      'users',
+      columns: ['profile_picture'],
+      where: 'username = ?',
+      whereArgs: [username],
+    );
+    return results.isNotEmpty ? results.first['profile_picture'] as String? : null;
+  }
+
   // Insert a new task into the database
   Future<int> insertTask(Map<String, dynamic> task) async {
     final db = await database;
-    return await db.insert('tasks', {
-      ...task,
-      'dateAdded': DateFormat('yyyy MMMM d').format(DateTime.now()), // Use DateFormat
-    });
+    return await db.insert('tasks', task);
   }
 
-  // Get all tasks from the database
-  Future<List<Map<String, dynamic>>> getTasks() async {
+  // Get all tasks for a specific user
+  Future<List<Map<String, dynamic>>> getTasksByUser(String username) async {
     final db = await database;
-    return await db.query('tasks');
+    return await db.query(
+      'tasks',
+      where: 'username = ?',
+      whereArgs: [username],
+      orderBy: 'dateAdded DESC',
+    );
   }
 
   // Delete a task by ID
